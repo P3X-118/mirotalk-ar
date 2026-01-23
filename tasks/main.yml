@@ -1,0 +1,31 @@
+---
+- name: Ensure app directory exists
+  ansible.builtin.file:
+    path: "{{ mirotalk_app_dir }}"
+    state: directory
+    mode: "0755"
+  become: true
+
+# Copy/render .env if needed (script: cp .env.template .env if missing)
+- name: Check if .env exists
+  ansible.builtin.stat:
+    path: "{{ mirotalk_app_dir }}/.env"
+  register: mirotalk_env_stat
+
+- name: Create .env from template (if missing)
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ mirotalk_app_dir }}/.env"
+    mode: "0644"
+  when: >
+    (not mirotalk_env_stat.stat.exists) or
+    (not mirotalk_create_only_if_missing)
+  become: true
+
+- name: Include docker tasks
+  ansible.builtin.include_tasks: docker.yml
+  when: mirotalk_mode | lower == "docker"
+
+- name: Include native tasks
+  ansible.builtin.include_tasks: native.yml
+  when: mirotalk_mode | lower == "native"

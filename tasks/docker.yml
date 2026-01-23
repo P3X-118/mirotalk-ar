@@ -1,0 +1,70 @@
+---
+- name: Install Docker and docker-compose (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name:
+      - docker.io
+      - docker-compose
+    state: present
+    update_cache: true
+  become: true
+
+# Script does: usermod -aG docker $USER
+# In Ansible we must choose which user to grant docker group membership to.
+# Defaulting to the SSH user.
+- name: Add ansible user to docker group
+  ansible.builtin.user:
+    name: "{{ ansible_user_id }}"
+    groups: docker
+    append: true
+  become: true
+
+# Create docker-compose.yml from template if missing (script behavior)
+- name: Check if docker-compose.yml exists
+  ansible.builtin.stat:
+    path: "{{ mirotalk_app_dir }}/{{ mirotalk_compose_file }}"
+  register: mirotalk_compose_stat
+
+- name: Create docker-compose.yml from template (if missing)
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ mirotalk_app_dir }}/{{ mirotalk_compose_file }}"
+    mode: "0644"
+  when: >
+    (not mirotalk_compose_stat.stat.exists) or
+    (not mirotalk_create_only_if_missing)
+  become: true
+
+# Official image pull vs build
+- name: Pull official image
+  community.docker.docker_image:
+    name: "{{ mirotalk_docker_image }}"
+    source: pull
+  when: mirotalk_use_official_image | bool
+  become: true
+
+- name: Build image from compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ mirotalk_app_dir }}"
+    files:
+      - "{{ mirotalk_compose_file }}"
+    build: always
+  when: not (mirotalk_use_official_image | bool)
+  become: true
+
+# Script removes dangling images. Optional, but included.
+- name: Remove dangling docker images (like <none>)
+  community.docker.docker_prune:
+    images: true
+    images_filters:
+      dangling: true
+  when: not (mirotalk_use_official_image | bool)
+  become: true
+
+- name: Start containers with docker compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ mirotalk_app_dir }}"
+    files:
+      - "{{ mirotalk_compose_file }}"
+    state: present
+    detached: "{{ mirotalk_compose_detached | bool }}"
+  become: true

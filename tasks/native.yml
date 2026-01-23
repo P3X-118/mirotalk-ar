@@ -1,0 +1,45 @@
+---
+# Mirrors: npm install && npm start
+
+- name: Install Node dependencies
+  ansible.builtin.command: npm install
+  args:
+    chdir: "{{ mirotalk_app_dir }}"
+  register: npm_install_result
+  changed_when: "'added' in npm_install_result.stdout or 'added' in npm_install_result.stderr"
+  become: true
+
+# For long-running services, systemd is better than running "npm start" in a play.
+# Here we create a systemd unit so it behaves like a real install.
+- name: Create systemd service for mirotalk (native)
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/mirotalk-p2p.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=MiroTalk P2P (native)
+      After=network.target
+
+      [Service]
+      Type=simple
+      WorkingDirectory={{ mirotalk_app_dir }}
+      ExecStart=/usr/bin/env {{ mirotalk_node_start_command }}
+      Restart=always
+      RestartSec=5
+      EnvironmentFile={{ mirotalk_app_dir }}/.env
+
+      [Install]
+      WantedBy=multi-user.target
+  become: true
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true
+
+- name: Enable and start mirotalk service
+  ansible.builtin.systemd:
+    name: mirotalk-p2p
+    enabled: true
+    state: started
+  become: true

@@ -1,0 +1,27 @@
+---
+mirotalk_enabled: true
+# Where the app source lives on the target host
+mirotalk_app_dir: /opt/mirotalk-p2p
+
+# Choose install/run mode: "docker" or "native"
+mirotalk_mode: docker
+
+# Docker behavior
+mirotalk_use_official_image: true
+mirotalk_docker_image: "legitservices/mirotalk:latest"
+mirotalk_compose_file: docker-compose.yml
+
+# Run containers in background?
+mirotalk_compose_detached: true
+
+# Native behavior
+mirotalk_node_start_command: "npm start"
+
+# Template sources (in your repo). The role will render these.
+# If you already have real template content, paste it into templates/.
+mirotalk_env_template: ".env.template"
+mirotalk_compose_template: "docker-compose.template.yml"
+
+# If true: mimic script behavior "only create if missing".
+# If false: always overwrite to match template.
+mirotalk_create_only_if_missing: true

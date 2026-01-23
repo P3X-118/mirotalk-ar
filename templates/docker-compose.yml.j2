@@ -1,0 +1,11 @@
+# Rendered by Ansible role mirotalk_p2p
+# TODO: Replace with your actual docker-compose.template.yml contents
+
+services:
+  mirotalk-p2p:
+    image: {{ mirotalk_docker_image }}
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    restart: unless-stopped
