@@ -1,31 +1,26 @@
+# SPDX-FileCopyrightText: 2025 SGC contributors
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 ---
-- name: Ensure app directory exists
-  ansible.builtin.file:
-    path: "{{ mirotalk_app_dir }}"
-    state: directory
-    mode: "0755"
-  become: true
+- name: Perform Mirotalk installation tasks
+  when: mirotalk_enabled | bool
+  tags:
+    - setup-all
+    - setup-mirotalk
+    - install-all
+    - install-mirotalk
+  block:
+    - name: Validate Mirotalk configuration
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/validate_config.yml"
+    - name: Install Mirotalk
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/install.yml"
 
-# Copy/render .env if needed (script: cp .env.template .env if missing)
-- name: Check if .env exists
-  ansible.builtin.stat:
-    path: "{{ mirotalk_app_dir }}/.env"
-  register: mirotalk_env_stat
-
-- name: Create .env from template (if missing)
-  ansible.builtin.template:
-    src: env.j2
-    dest: "{{ mirotalk_app_dir }}/.env"
-    mode: "0644"
-  when: >
-    (not mirotalk_env_stat.stat.exists) or
-    (not mirotalk_create_only_if_missing)
-  become: true
-
-- name: Include docker tasks
-  ansible.builtin.include_tasks: docker.yml
-  when: mirotalk_mode | lower == "docker"
-
-- name: Include native tasks
-  ansible.builtin.include_tasks: native.yml
-  when: mirotalk_mode | lower == "native"
+- name: Perform Mirotalk uninstallation tasks
+  when: not mirotalk_enabled | bool
+  tags:
+    - setup-all
+    - setup-mirotalk
+  block:
+    - name: Uninstall Mirotalk
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/uninstall.yml"

@@ -1,0 +1,85 @@
+# SPDX-FileCopyrightText: 2025 SGC contributors
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+---
+- name: Ensure Mirotalk paths exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0750"
+    owner: "{{ mirotalk_uid }}"
+    group: "{{ mirotalk_gid }}"
+  with_items:
+    - "{{ mirotalk_base_path }}"
+
+- name: Ensure Mirotalk support files installed
+  ansible.builtin.template:
+    src: "{{ role_path }}/templates/{{ item }}.j2"
+    dest: "{{ mirotalk_base_path }}/{{ item }}"
+    mode: "0640"
+    owner: "{{ mirotalk_uid }}"
+    group: "{{ mirotalk_gid }}"
+  with_items:
+    - env
+    - labels
+  register: mirotalk_support_files_result
+
+- name: Ensure Mirotalk container image is pulled via community.docker.docker_image
+  when: sysd_docker_image_pull_method == 'ansible-module'
+  community.docker.docker_image:
+    name: "{{ mirotalk_container_image }}"
+    source: "{{ 'pull' if ansible_version.major > 2 or ansible_version.minor > 7 else omit }}"
+    force_source: "{{ mirotalk_container_image_force_pull if ansible_version.major > 2 or ansible_version.minor >= 8 else omit }}"
+    force: "{{ omit if ansible_version.major > 2 or ansible_version.minor >= 8 else mirotalk_container_image_force_pull }}"
+  register: mirotalk_container_image_pull_result
+  retries: "{{ container_retry }}"
+  delay: "{{ container_retry_delay }}"
+  until: mirotalk_container_image_pull_result is not failed
+
+- name: Ensure Mirotalk container image is pulled via ansible.builtin.command
+  when: sysd_docker_image_pull_method == 'command'
+  ansible.builtin.command:
+    cmd: "{{ sysd_docker_host_command }} pull {{ mirotalk_container_image }}"
+  register: mirotalk_container_image_pull_result
+  retries: "{{ container_retry }}"
+  delay: "{{ container_retry_delay }}"
+  until: mirotalk_container_image_pull_result is not failed
+  changed_when: "'Downloaded newer image' in mirotalk_container_image_pull_result.stdout"
+
+- name: Ensure Mirotalk container network is created via community.docker.docker_network
+  when: sysd_docker_net_creation_method == 'ansible-module'
+  community.docker.docker_network:
+    enable_ipv6: "{{ sysd_docker_ipv6_enabled }}"
+    name: "{{ mirotalk_container_network }}"
+    driver: bridge
+    driver_options: "{{ sysd_docker_net_driver_opts }}"
+  register: mirotalk_network_creation_result
+
+- name: Ensure Mirotalk container network is created via ansible.builtin.command
+  when: sysd_docker_net_creation_method == 'command'
+  ansible.builtin.command:
+    cmd: >-
+      {{ sysd_docker_host_command }} network create
+      {% if sysd_docker_ipv6_enabled %}--ipv6{% endif %}
+      {{ sysd_docker_net_driver_opts_string }}
+      {{ mirotalk_container_network }}
+  register: mirotalk_network_creation_result
+  changed_when: mirotalk_network_creation_result.rc == 0
+  failed_when: mirotalk_network_creation_result.rc != 0 and 'already exists' not in mirotalk_network_creation_result.stderr
+
+- name: Ensure Mirotalk systemd service is present
+  ansible.builtin.template:
+    src: "{{ role_path }}/templates/systemd/mirotalk.service.j2"
+    dest: "{{ sysd_docker_service_path }}/{{ mirotalk_identifier }}.service"
+    mode: "0644"
+  register: mirotalk_systemd_service_result
+
+- name: Determine whether Mirotalk needs a restart
+  ansible.builtin.set_fact:
+    mirotalk_restart_necessary: >-
+      {{
+        mirotalk_support_files_result.changed | default(false)
+        or mirotalk_systemd_service_result.changed | default(false)
+        or mirotalk_container_image_pull_result.changed | default(false)
+      }}

@@ -1,0 +1,51 @@
+# SPDX-FileCopyrightText: 2025 SGC contributors
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+---
+- name: Fail if required Mirotalk settings not defined
+  ansible.builtin.fail:
+    msg: >-
+      You need to define a required configuration setting (`{{ item }}`).
+  when: "lookup('vars', item, default='') | string | length == 0"
+  with_items:
+    - mirotalk_uid
+    - mirotalk_gid
+    - mirotalk_hostname
+    - mirotalk_path_prefix
+    - mirotalk_container_network
+    - mirotalk_environment_variables_jwt_key
+    - mirotalk_environment_variables_api_key_secret
+
+- name: Fail if Mirotalk node env is invalid
+  ansible.builtin.fail:
+    msg: >-
+      mirotalk_environment_variables_node_env must be 'development' or 'production'
+  when: "mirotalk_environment_variables_node_env not in ['development', 'production']"
+
+- name: Fail if OIDC is enabled but session secret is empty
+  ansible.builtin.fail:
+    msg: >-
+      mirotalk_environment_variables_session_secret must be set when OIDC is enabled.
+  when:
+    - mirotalk_environment_variables_oidc_enabled | bool
+    - mirotalk_environment_variables_session_secret | length == 0
+
+- name: Run if Traefik is enabled
+  when: mirotalk_container_labels_traefik_enabled | bool
+  block:
+    - name: Fail if Traefik settings required for Mirotalk are not defined
+      ansible.builtin.fail:
+        msg: >-
+          You need to define a required configuration setting (`{{ item }}`).
+      when: "lookup('vars', item, default='') | string | length == 0"
+      with_items:
+        - mirotalk_container_labels_traefik_hostname
+        - mirotalk_container_labels_traefik_path_prefix
+
+    - name: Fail if mirotalk_container_labels_traefik_path_prefix is different than /
+      ansible.builtin.fail:
+        msg: >-
+          mirotalk_container_labels_traefik_path_prefix (`{{ mirotalk_container_labels_traefik_path_prefix }}`) must be `/`.
+          Mirotalk does not support hosting under a subpath.
+      when: "mirotalk_container_labels_traefik_path_prefix != '/'"
