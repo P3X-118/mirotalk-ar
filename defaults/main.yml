@@ -1,27 +1,236 @@
 ---
+# Project source code URL: https://github.com/miroslavpejic85/mirotalk
+# SGC fork: https://github.com/P3X-118/mirotalk
+
 mirotalk_enabled: true
-# Where the app source lives on the target host
-mirotalk_app_dir: /opt/mirotalk-p2p
 
-# Choose install/run mode: "docker" or "native"
-mirotalk_mode: docker
+mirotalk_identifier: mirotalk
+mirotalk_base_path: "/{{ mirotalk_identifier }}"
 
-# Docker behavior
-mirotalk_use_official_image: true
-mirotalk_docker_image: "legitservices/mirotalk:latest"
-mirotalk_compose_file: docker-compose.yml
+# renovate: datasource=docker depName=legitservices/mirotalk
+mirotalk_version: v1.8.31-0
 
-# Run containers in background?
-mirotalk_compose_detached: true
+mirotalk_uid: ""
+mirotalk_gid: ""
 
-# Native behavior
-mirotalk_node_start_command: "npm start"
+# The scheme used for serving Mirotalk.
+mirotalk_scheme: https
 
-# Template sources (in your repo). The role will render these.
-# If you already have real template content, paste it into templates/.
-mirotalk_env_template: ".env.template"
-mirotalk_compose_template: "docker-compose.template.yml"
+# The hostname at which Mirotalk is served.
+mirotalk_hostname: ""
 
-# If true: mimic script behavior "only create if missing".
-# If false: always overwrite to match template.
-mirotalk_create_only_if_missing: true
+# The path at which Mirotalk is served.
+# Mirotalk does not currently support hosting under a subpath; this must be `/`.
+mirotalk_path_prefix: /
+
+mirotalk_container_image: "{{ mirotalk_container_image_registry_prefix }}legitservices/mirotalk:{{ mirotalk_container_image_tag }}"
+mirotalk_container_image_tag: "{{ mirotalk_version }}"
+mirotalk_container_image_registry_prefix: "{{ mirotalk_container_image_registry_prefix_upstream }}"
+mirotalk_container_image_registry_prefix_upstream: "{{ mirotalk_container_image_registry_prefix_upstream_default }}"
+mirotalk_container_image_registry_prefix_upstream_default: docker.io/
+mirotalk_container_image_force_pull: "{{ mirotalk_container_image.endswith(':latest') }}"
+
+# The base container network. It will be auto-created by this role if it doesn't exist already.
+mirotalk_container_network: "{{ mirotalk_identifier }}"
+
+# Control if the container network is deleted on uninstalling.
+mirotalk_container_network_deletion_enabled: true
+
+# Specify how the container publishes its HTTP port (as defined by `mirotalk_container_http_port`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:3000"), or empty string to not expose.
+mirotalk_container_http_host_bind_port: ""
+
+# The port number in the container.
+# Mirotalk's signaling/HTTP server listens on this port (httpolyglot serves both HTTP and HTTPS).
+mirotalk_container_http_port: 3000
+
+# A list of additional container networks that the container would be connected to.
+# The role does not create these networks, so make sure they already exist.
+# Use this to expose this container to another reverse proxy, which runs in a different container network.
+mirotalk_container_additional_networks: "{{ mirotalk_container_additional_networks_auto + mirotalk_container_additional_networks_custom }}"
+mirotalk_container_additional_networks_auto: []
+mirotalk_container_additional_networks_custom: []
+
+# A list of additional "volumes" to mount in the container.
+mirotalk_container_additional_volumes: "{{ mirotalk_container_additional_volumes_auto + mirotalk_container_additional_volumes_custom }}"
+mirotalk_container_additional_volumes_auto: []
+mirotalk_container_additional_volumes_custom: []
+
+# mirotalk_container_labels_traefik_enabled controls whether labels to assist a Traefik reverse-proxy will be attached to the container.
+# See `../templates/labels.j2` for details.
+#
+# To inject your own other container labels, see `mirotalk_container_labels_additional_labels_custom`.
+mirotalk_container_labels_traefik_enabled: false
+mirotalk_container_labels_traefik_docker_network: "{{ mirotalk_container_network }}"
+mirotalk_container_labels_traefik_hostname: "{{ mirotalk_hostname }}"
+# The path prefix must either be `/` or not end with a slash.
+mirotalk_container_labels_traefik_path_prefix: "{{ mirotalk_path_prefix }}"
+mirotalk_container_labels_traefik_rule: "Host(`{{ mirotalk_container_labels_traefik_hostname }}`){% if mirotalk_container_labels_traefik_path_prefix != '/' %} && PathPrefix(`{{ mirotalk_container_labels_traefik_path_prefix }}`){% endif %}"
+mirotalk_container_labels_traefik_priority: 0
+mirotalk_container_labels_traefik_entrypoints: web-secure
+mirotalk_container_labels_traefik_tls: "{{ mirotalk_container_labels_traefik_entrypoints != 'web' }}"
+mirotalk_container_labels_traefik_tls_certResolver: default  # noqa var-naming
+
+# Controls which additional headers to attach to all HTTP requests.
+mirotalk_container_labels_traefik_additional_request_headers: "{{ mirotalk_container_labels_traefik_additional_request_headers_auto | combine(mirotalk_container_labels_traefik_additional_request_headers_custom) }}"
+mirotalk_container_labels_traefik_additional_request_headers_auto: {}
+mirotalk_container_labels_traefik_additional_request_headers_custom: {}
+
+# Controls which additional headers to attach to all HTTP responses.
+mirotalk_container_labels_traefik_additional_response_headers: "{{ mirotalk_container_labels_traefik_additional_response_headers_auto | combine(mirotalk_container_labels_traefik_additional_response_headers_custom) }}"
+mirotalk_container_labels_traefik_additional_response_headers_auto: |
+  {{
+    {}
+    | combine ({'X-XSS-Protection': mirotalk_http_header_xss_protection} if mirotalk_http_header_xss_protection else {})
+    | combine ({'X-Content-Type-Options': mirotalk_http_header_content_type_options} if mirotalk_http_header_content_type_options else {})
+    | combine ({'Content-Security-Policy': mirotalk_http_header_content_security_policy} if mirotalk_http_header_content_security_policy else {})
+    | combine ({'Permissions-Policy': mirotalk_http_header_permissions_policy} if mirotalk_http_header_permissions_policy else {})
+    | combine ({'Strict-Transport-Security': mirotalk_http_header_strict_transport_security} if mirotalk_http_header_strict_transport_security and mirotalk_container_labels_traefik_tls else {})
+  }}
+mirotalk_container_labels_traefik_additional_response_headers_custom: {}
+
+# Additional labels to attach to the container label file.
+mirotalk_container_labels_additional_labels: "{{ mirotalk_container_labels_additional_labels_auto + mirotalk_container_labels_additional_labels_custom }}"
+mirotalk_container_labels_additional_labels_auto: []
+mirotalk_container_labels_additional_labels_custom: []
+
+# A list of extra arguments to pass to the container (`docker create` command)
+mirotalk_container_extra_arguments: "{{ mirotalk_container_extra_arguments_auto + mirotalk_container_extra_arguments_custom }}"
+mirotalk_container_extra_arguments_auto: []
+mirotalk_container_extra_arguments_custom: []
+
+# Security headers
+mirotalk_http_header_xss_protection: "1; mode=block"
+mirotalk_http_header_content_type_options: nosniff
+# Mirotalk requires inline scripts/styles for the room UI; CSP is restrictive about framing only.
+mirotalk_http_header_content_security_policy: frame-ancestors 'self'
+mirotalk_http_header_permissions_policy: "{{ 'interest-cohort=()' if mirotalk_floc_optout_enabled else '' }}"
+mirotalk_http_header_strict_transport_security: "max-age=31536000; includeSubDomains{{ '; preload' if mirotalk_hsts_preload_enabled else '' }}"
+mirotalk_floc_optout_enabled: true
+mirotalk_hsts_preload_enabled: false
+
+# List of systemd services that the Mirotalk systemd service depends on
+mirotalk_systemd_required_services_list: "{{ mirotalk_systemd_required_services_list_default + mirotalk_systemd_required_services_list_auto + mirotalk_systemd_required_services_list_custom }}"
+mirotalk_systemd_required_services_list_default: "{{ [sysd_docker_service] if sysd_docker_service else [] }}"
+mirotalk_systemd_required_services_list_auto: []
+mirotalk_systemd_required_services_list_custom: []
+
+# List of systemd services that the Mirotalk systemd service wants
+mirotalk_systemd_wanted_services_list: "{{ mirotalk_systemd_wanted_services_list_default + mirotalk_systemd_wanted_services_list_auto + mirotalk_systemd_wanted_services_list_custom }}"
+mirotalk_systemd_wanted_services_list_default: []
+mirotalk_systemd_wanted_services_list_auto: []
+mirotalk_systemd_wanted_services_list_custom: []
+
+# ============================================================
+# Mirotalk runtime configuration (rendered into env)
+# ============================================================
+
+# Public-facing URL of the Mirotalk instance (used by the server for absolute URLs).
+mirotalk_environment_variables_host: "{{ mirotalk_scheme }}://{{ mirotalk_hostname }}"
+
+# NODE_ENV. Valid values: production, development.
+mirotalk_environment_variables_node_env: production
+
+# Trust proxy. MUST be true when running behind Traefik so the server reads X-Forwarded-* correctly.
+mirotalk_environment_variables_trust_proxy: true
+
+# Specify the timezone (IANA tz name).
+mirotalk_environment_variables_tz: UTC
+
+# Logs
+mirotalk_environment_variables_logs_debug: false
+mirotalk_environment_variables_logs_colors: false
+mirotalk_environment_variables_logs_json: true
+mirotalk_environment_variables_logs_json_pretty: false
+
+# CORS
+# Origin: '*' to allow all, or a JSON array string like '["https://example.com"]'.
+mirotalk_environment_variables_cors_origin: '*'
+mirotalk_environment_variables_cors_methods: '["GET", "POST"]'
+
+# IP whitelist
+mirotalk_environment_variables_ip_whitelist_enabled: false
+mirotalk_environment_variables_ip_whitelist_allowed: '["127.0.0.1", "::1"]'
+
+# OIDC (Open ID Connect) — disabled by default
+mirotalk_environment_variables_oidc_enabled: false
+mirotalk_environment_variables_oidc_allow_rooms_creation_for_auth_users: true
+mirotalk_environment_variables_oidc_base_url_dynamic: false
+mirotalk_environment_variables_oidc_issuer_base_url: ''
+mirotalk_environment_variables_oidc_base_url: "{{ mirotalk_environment_variables_host }}"
+mirotalk_environment_variables_oidc_client_id: ''
+mirotalk_environment_variables_oidc_client_secret: ''
+mirotalk_environment_variables_oidc_auth_required: false
+mirotalk_environment_variables_oidc_auth_logout: true
+mirotalk_environment_variables_session_secret: ''
+
+# Active rooms display
+mirotalk_environment_variables_show_active_rooms: false
+
+# Maximum participants per room
+mirotalk_environment_variables_room_max_participants: 1000
+
+# Host protection (login). Required username/password to initialize/join rooms.
+mirotalk_environment_variables_host_protected: false
+mirotalk_environment_variables_host_user_auth: false
+mirotalk_environment_variables_host_users: '[{"username": "admin", "password": "admin"}]'
+mirotalk_environment_variables_host_max_login_attempts: 5
+mirotalk_environment_variables_host_min_login_block_time: 15
+
+# JWT — used for short-lived room join tokens
+mirotalk_environment_variables_jwt_key: ''
+mirotalk_environment_variables_jwt_exp: 1h
+
+# REST API
+mirotalk_environment_variables_api_disabled: '["token", "meeting", "meetings", "join", "stats"]'
+mirotalk_environment_variables_api_key_secret: ''
+
+# WebRTC STUN/TURN
+mirotalk_environment_variables_stun_server_enabled: true
+mirotalk_environment_variables_stun_server_url: 'stun:stun.l.google.com:19302'
+mirotalk_environment_variables_turn_server_enabled: false
+mirotalk_environment_variables_turn_server_url: ''
+mirotalk_environment_variables_turn_server_username: ''
+mirotalk_environment_variables_turn_server_credential: ''
+
+# IP lookup
+mirotalk_environment_variables_ip_lookup_enabled: false
+
+# Survey/redirect (post-call)
+mirotalk_environment_variables_survey_enabled: false
+mirotalk_environment_variables_survey_url: ''
+mirotalk_environment_variables_redirect_enabled: false
+mirotalk_environment_variables_redirect_url: ''
+
+# Sentry, Slack, Mattermost, Webhook, ChatGPT, Ngrok — disabled by default
+mirotalk_environment_variables_sentry_enabled: false
+mirotalk_environment_variables_sentry_dsn: ''
+mirotalk_environment_variables_slack_enabled: false
+mirotalk_environment_variables_slack_signing_secret: ''
+mirotalk_environment_variables_mattermost_enabled: false
+mirotalk_environment_variables_mattermost_token: ''
+mirotalk_environment_variables_webhook_enabled: false
+mirotalk_environment_variables_webhook_url: ''
+mirotalk_environment_variables_chatgpt_enabled: false
+mirotalk_environment_variables_chatgpt_api_key: ''
+mirotalk_environment_variables_chatgpt_base_path: 'https://api.openai.com/v1/'
+mirotalk_environment_variables_chatgpt_model: 'gpt-4o-mini'
+mirotalk_environment_variables_ngrok_enabled: false
+mirotalk_environment_variables_ngrok_authtoken: ''
+
+# Email (nodemailer) — disabled by default
+mirotalk_environment_variables_email_alert: false
+mirotalk_environment_variables_email_host: ''
+mirotalk_environment_variables_email_port: 587
+mirotalk_environment_variables_email_username: ''
+mirotalk_environment_variables_email_password: ''
+mirotalk_environment_variables_email_from: ''
+mirotalk_environment_variables_email_send_to: ''
+
+# Additional environment variables (raw passthrough block).
+mirotalk_environment_variables_additional_variables: ""
+
+# mirotalk_restart_necessary controls whether the Mirotalk systemd service will be restarted.
+# Auto-computed by install.yml.
+mirotalk_restart_necessary: false

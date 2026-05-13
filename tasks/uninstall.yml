@@ -1,0 +1,58 @@
+# SPDX-FileCopyrightText: 2025 SGC contributors
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+---
+- name: Check existence of Mirotalk systemd service
+  ansible.builtin.stat:
+    path: "{{ sysd_docker_service_path }}/{{ mirotalk_identifier }}.service"
+  register: mirotalk_service_stat
+
+- name: Uninstall Mirotalk systemd services and files
+  when: mirotalk_service_stat.stat.exists | bool
+  block:
+    - name: Ensure Mirotalk systemd service is stopped
+      ansible.builtin.service:
+        name: "{{ mirotalk_identifier }}"
+        state: stopped
+        enabled: false
+        daemon_reload: true
+
+    - name: Ensure Mirotalk systemd service does not exist
+      ansible.builtin.file:
+        path: "{{ sysd_docker_service_path }}/{{ mirotalk_identifier }}.service"
+        state: absent
+
+    - name: Ensure Mirotalk support files do not exist
+      ansible.builtin.file:
+        path: "{{ mirotalk_base_path }}/{{ item }}"
+        state: absent
+      with_items:
+        - env
+        - labels
+
+    - name: Ensure Mirotalk base path does not exist if empty
+      ansible.builtin.command:
+        cmd: "rmdir {{ mirotalk_base_path }}"
+      register: mirotalk_base_path_deletion_result
+      changed_when: mirotalk_base_path_deletion_result.rc == 0
+      failed_when: false
+
+    - name: Ensure Mirotalk container network does not exist
+      when: mirotalk_container_network_deletion_enabled
+      block:
+        - name: Ensure Mirotalk container network does not exist via community.docker.docker_network
+          when: sysd_docker_net_creation_method == 'ansible-module'
+          community.docker.docker_network:
+            name: "{{ mirotalk_container_network }}"
+            state: absent
+          register: mirotalk_network_deletion_result
+
+        - name: Ensure Mirotalk container network does not exist via ansible.builtin.command
+          when: sysd_docker_net_creation_method == 'command'
+          ansible.builtin.command:
+            cmd: >-
+              {{ sysd_docker_host_command }} network rm
+              {{ mirotalk_container_network }}
+          register: mirotalk_network_deletion_result
+          changed_when: mirotalk_container_network in mirotalk_network_deletion_result.stdout
