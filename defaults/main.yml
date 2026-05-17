@@ -8,7 +8,7 @@ mirotalk_identifier: mirotalk
 mirotalk_base_path: "/{{ mirotalk_identifier }}"
 
 # renovate: datasource=docker depName=legitservices/mirotalk
-mirotalk_version: v1.8.31-1
+mirotalk_version: v1.8.31-2
 
 mirotalk_uid: ""
 mirotalk_gid: ""
