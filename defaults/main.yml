@@ -8,7 +8,7 @@ mirotalk_identifier: mirotalk
 mirotalk_base_path: "/{{ mirotalk_identifier }}"
 
 # renovate: datasource=docker depName=legitservices/mirotalk
-mirotalk_version: v1.8.31-2
+mirotalk_version: v1.8.31-3
 
 mirotalk_uid: ""
 mirotalk_gid: ""
@@ -137,6 +137,11 @@ mirotalk_environment_variables_trust_proxy: true
 
 # Specify the timezone (IANA tz name).
 mirotalk_environment_variables_tz: UTC
+
+# Brand preset baked into the image: selects the UI brand (name/titles/palette)
+# and the room-name dictionary, served to clients via GET /brand.
+# Valid values: sgc (SGC Meet, default) | smooje (Libations / cooey.club).
+mirotalk_environment_variables_brand_preset: sgc
 
 # Logs
 mirotalk_environment_variables_logs_debug: false
