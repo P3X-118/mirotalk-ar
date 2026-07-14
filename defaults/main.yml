@@ -8,7 +8,7 @@ mirotalk_identifier: mirotalk
 mirotalk_base_path: "/{{ mirotalk_identifier }}"
 
 # renovate: datasource=docker depName=legitservices/mirotalk
-mirotalk_version: v1.8.31-3
+mirotalk_version: v1.8.31-4
 
 mirotalk_uid: ""
 mirotalk_gid: ""
@@ -192,8 +192,10 @@ mirotalk_environment_variables_api_disabled: '["token", "meeting", "meetings", "
 mirotalk_environment_variables_api_key_secret: ''
 
 # WebRTC STUN/TURN
-mirotalk_environment_variables_stun_server_enabled: true
-mirotalk_environment_variables_stun_server_url: 'stun:stun.l.google.com:19302'
+# No external/public STUN by default — point at your OWN coturn via host_vars
+# (SGC deployments set these to the coturn we run, e.g. meet.sgc.ai).
+mirotalk_environment_variables_stun_server_enabled: false
+mirotalk_environment_variables_stun_server_url: ''
 mirotalk_environment_variables_turn_server_enabled: false
 mirotalk_environment_variables_turn_server_url: ''
 mirotalk_environment_variables_turn_server_username: ''
@@ -207,6 +209,15 @@ mirotalk_environment_variables_survey_enabled: false
 mirotalk_environment_variables_survey_url: ''
 mirotalk_environment_variables_redirect_enabled: false
 mirotalk_environment_variables_redirect_url: ''
+
+# Analytics — self-hosted Plausible (SGC webstats). Off by default; SGC
+# deployments enable it via host_vars and point src at the public ingest
+# proxy (e.g. https://stats.cooey.club/js/script.js) with domain = the
+# Plausible site key (the FQDN being tracked).
+mirotalk_environment_variables_stats_enabled: false
+mirotalk_environment_variables_stats_src: ''
+mirotalk_environment_variables_stats_domain: "{{ mirotalk_hostname }}"
+mirotalk_environment_variables_stats_api: ''
 
 # Sentry, Slack, Mattermost, Webhook, ChatGPT, Ngrok — disabled by default
 mirotalk_environment_variables_sentry_enabled: false
