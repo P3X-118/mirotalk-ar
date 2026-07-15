@@ -8,7 +8,7 @@ mirotalk_identifier: mirotalk
 mirotalk_base_path: "/{{ mirotalk_identifier }}"
 
 # renovate: datasource=docker depName=legitservices/mirotalk
-mirotalk_version: v1.8.31-5
+mirotalk_version: v1.8.31-6
 
 mirotalk_uid: ""
 mirotalk_gid: ""
@@ -167,6 +167,9 @@ mirotalk_environment_variables_oidc_base_url: "{{ mirotalk_environment_variables
 mirotalk_environment_variables_oidc_client_id: ''
 mirotalk_environment_variables_oidc_client_secret: ''
 mirotalk_environment_variables_oidc_auth_required: false
+# false = optional-OIDC (identity only; anonymous access preserved, signed-in
+# users auto-join with their name); true = force login on the app pages.
+mirotalk_environment_variables_oidc_force_login: false
 mirotalk_environment_variables_oidc_auth_logout: true
 mirotalk_environment_variables_session_secret: ''
 
